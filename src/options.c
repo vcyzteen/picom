@@ -124,6 +124,12 @@ static void usage(const char *argv0, int ret) {
 	    "--rounded-corners-exclude condition\n"
 	    "  Exclude conditions for rounded corners.\n"
 	    "\n"
+	    "--round-borders value\n"
+	    "  When rounding corners, round the borders of windows. (defaults to 1)\n"
+	    "\n"
+	    "--round-borders-exclude condition\n"
+	    "  Exclude conditions for rounding borders.\n"
+	    "\n"
 	    "--mark-wmwin-focused\n"
 	    "  Try to detect WM windows and mark them as active.\n"
 	    "\n"
@@ -209,8 +215,8 @@ static void usage(const char *argv0, int ret) {
 	    "\n"
 	    "--blur-method\n"
 	    "  The algorithm used for background bluring. Available choices are:\n"
-	    "  'none' to disable, 'gaussian', 'box' or 'kernel' for custom\n"
-	    "  convolution blur with --blur-kern.\n"
+	    "  'none' to disable, 'dual_kawase', 'gaussian', 'box' or 'kernel'\n"
+	    "  for custom convolution blur with --blur-kern.\n"
 	    "  Note: 'gaussian' and 'box' require --experimental-backends.\n"
 	    "\n"
 	    "--blur-size\n"
@@ -237,6 +243,7 @@ static void usage(const char *argv0, int ret) {
 	    "  opacity.\n"
 	    "\n"
 	    "--blur-kern matrix\n"
+		"  Only valid for '--blur-method convolution'!\n"
 	    "  Specify the blur convolution kernel, with the following format:\n"
 	    "    WIDTH,HEIGHT,ELE1,ELE2,ELE3,ELE4,ELE5...\n"
 	    "  The element in the center must not be included, it will be forever\n"
@@ -447,8 +454,11 @@ static const struct option longopts[] = {
     {"blur-deviation", required_argument, NULL, 330},
     {"blur-strength", required_argument, NULL, 331},
     {"shadow-color", required_argument, NULL, 332},
-    {"corner-radius", required_argument, NULL, 333},
-    {"rounded-corners-exclude", required_argument, NULL, 334},
+    {"corner-radius", required_argument, NULL, 340},
+    {"rounded-corners-exclude", required_argument, NULL, 341},
+    {"round-borders", required_argument, NULL, 342},
+    {"round-borders-exclude", required_argument, NULL, 343},
+    {"round-borders-rule", required_argument, NULL, 344},
     {"experimental-backends", no_argument, NULL, 733},
     {"monitor-repaint", no_argument, NULL, 800},
     {"diagnostics", no_argument, NULL, 801},
@@ -866,7 +876,16 @@ bool get_cfg(options_t *opt, int argc, char *const *argv, bool shadow_enable,
 			break;
 		case 331:
 			// --blur-strength
-			opt->blur_strength = atoi(optarg);
+			opt->blur_strength = parse_kawase_blur_strength(atoi(optarg));
+			break;
+		case 340: opt->corner_radius = atoi(optarg); break;
+		case 341: condlst_add(&opt->rounded_corners_blacklist, optarg); break;
+		case 342: opt->round_borders = atoi(optarg); break;
+		case 343: condlst_add(&opt->round_borders_blacklist, optarg); break;
+		case 344:
+			// --round_borders_rule
+			if (!parse_rule_border(&opt->round_borders_rules, optarg))
+				exit(1);
 			break;
 		case 333:
 			// --cornor-radius
@@ -965,6 +984,18 @@ bool get_cfg(options_t *opt, int argc, char *const *argv, bool shadow_enable,
 		opt->track_leader = true;
 	}
 
+	// Blur method kawase is not compatible with the xrender backend
+	if (opt->backend != BKEND_GLX && (opt->blur_method == BLUR_METHOD_DUAL_KAWASE
+					|| opt->blur_method == BLUR_METHOD_ALT_KAWASE)) {
+		log_warn("Blur method 'dual_kawase' is incompatible with the XRender backend. Fall back to default.\n");
+		opt->blur_method = BLUR_METHOD_KERNEL;
+	}
+
+	if (opt->experimental_backends && opt->blur_method == BLUR_METHOD_ALT_KAWASE) {
+		log_warn("Blur method 'alt_kawase' is incompatible with experimental backends. Fall back to default.\n");
+		opt->blur_method = BLUR_METHOD_KERNEL;
+	}
+
 	// Fill default blur kernel
 	if (opt->blur_method == BLUR_METHOD_KERNEL &&
 	    (!opt->blur_kerns || !opt->blur_kerns[0])) {
@@ -974,22 +1005,26 @@ bool get_cfg(options_t *opt, int argc, char *const *argv, bool shadow_enable,
 		CHECK(opt->blur_kernel_count);
 	}
 
+	// override blur_kernel_count for kawase
+	if (opt->blur_method == BLUR_METHOD_DUAL_KAWASE ||
+		opt->blur_method == BLUR_METHOD_ALT_KAWASE) {
+		opt->blur_kernel_count = MAX_BLUR_PASS;
+		opt->blur_kerns = ccalloc(opt->blur_kernel_count, struct conv *);
+		CHECK(opt->blur_kerns);
+		CHECK(opt->blur_kernel_count);
+	}
+
 	// Sanitize parameters for dual-filter kawase blur
 	if (opt->blur_method == BLUR_METHOD_DUAL_KAWASE) {
-		if (opt->blur_strength <= 0 && opt->blur_radius > 500) {
+		if (opt->blur_strength.strength <= 0 && opt->blur_radius > 500) {
 			log_warn("Blur radius >500 not supported by dual_kawase method, "
 			         "capping to 500.");
 			opt->blur_radius = 500;
 		}
-		if (opt->blur_strength > 20) {
+		if (opt->blur_strength.strength > 20) {
 			log_warn("Blur strength >20 not supported by dual_kawase method, "
 			         "capping to 20.");
-			opt->blur_strength = 20;
-		}
-		if (!opt->experimental_backends) {
-			log_warn("Dual-kawase blur is not implemented by the legacy "
-			         "backends, you must use the `experimental-backends` "
-			         "option.");
+			opt->blur_strength.strength = 20;
 		}
 	}
 
@@ -1000,12 +1035,6 @@ bool get_cfg(options_t *opt, int argc, char *const *argv, bool shadow_enable,
 	if (opt->backend == BKEND_XRENDER && conv_kern_hasneg) {
 		log_warn("A convolution kernel with negative values may not work "
 		         "properly under X Render backend.");
-	}
-
-	if (opt->corner_radius > 0 && opt->experimental_backends) {
-		log_warn("Rounded corner is only supported on legacy backends, it "
-		         "will be disabled");
-		opt->corner_radius = 0;
 	}
 
 	return true;

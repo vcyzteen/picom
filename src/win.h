@@ -40,13 +40,13 @@ typedef struct _glx_texture glx_texture_t;
 //       it is very unideal for it to be here
 typedef struct {
 	/// Framebuffer used for blurring.
-	GLuint fbo;
+	GLuint fbos[MAX_BLUR_PASS];
 	/// Textures used for blurring.
-	GLuint textures[2];
+	GLuint textures[MAX_BLUR_PASS];
 	/// Width of the textures.
-	int width;
+	int width[MAX_BLUR_PASS];
 	/// Height of the textures.
-	int height;
+	int height[MAX_BLUR_PASS];
 } glx_blur_cache_t;
 #endif
 
@@ -220,6 +220,9 @@ struct managed_win {
 
 	/// Radius of rounded window corners
 	int corner_radius;
+	bool round_borders;
+	float border_col[4];
+    uint16_t border_width;
 
 	// Fading-related members
 	/// Override value of window fade state. Set by D-Bus method calls.
@@ -270,6 +273,7 @@ struct managed_win {
 #ifdef CONFIG_OPENGL
 	/// Textures and FBO background blur use.
 	glx_blur_cache_t glx_blur_cache;
+	glx_blur_cache_t glx_round_cache;
 	/// Background texture of the window
 	glx_texture_t *glx_texture_bg;
 #endif
@@ -298,7 +302,7 @@ bool must_use destroy_win_start(session_t *ps, struct win *w);
 /// Release images bound with a window, set the *_NONE flags on the window. Only to be
 /// used when de-initializing the backend outside of win.c
 void win_release_images(struct backend_base *base, struct managed_win *w);
-winmode_t attr_pure win_calc_mode(const struct managed_win *w);
+winmode_t attr_pure win_calc_mode(session_t *ps, const struct managed_win *w);
 void win_set_shadow_force(session_t *ps, struct managed_win *w, switch_t val);
 void win_set_fade_force(struct managed_win *w, switch_t val);
 void win_set_focused_force(session_t *ps, struct managed_win *w, switch_t val);

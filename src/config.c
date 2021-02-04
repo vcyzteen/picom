@@ -95,6 +95,12 @@ enum blur_method parse_blur_method(const char *src) {
 		         "Interpreted as 'dual_kawase', but this will stop working "
 		         "soon.");
 		return BLUR_METHOD_DUAL_KAWASE;
+	} else if (strcmp(src, "kawase_alt") == 0 || strcmp(src, "alt_kawase") == 0) {
+		// new code from tryone144's `improved_fbo` branch
+		log_warn("Using experimental code from tryone144's 'improved_fbo'"
+		         "branch "
+		         "(https://github.com/tryone144/compton/tree/improved_fbo).");
+		return BLUR_METHOD_ALT_KAWASE;
 	} else if (strcmp(src, "none") == 0) {
 		return BLUR_METHOD_NONE;
 	}
@@ -439,6 +445,36 @@ bool parse_rule_opacity(c2_lptr_t **res, const char *src) {
 }
 
 /**
+ * Parse a list of border width rules.
+ */
+bool parse_rule_border(c2_lptr_t **res, const char *src) {
+	// Find opacity value
+	char *endptr = NULL;
+	long val = strtol(src, &endptr, 0);
+	if (!endptr || endptr == src) {
+		log_error("No border width specified: %s", src);
+		return false;
+	}
+	if (val > 100 || val < 0) {
+		log_error("Border width %ld invalid: %s", val, src);
+		return false;
+	}
+
+	// Skip over spaces
+	while (*endptr && isspace(*endptr))
+		++endptr;
+	if (':' != *endptr) {
+		log_error("Border width terminator not found: %s", src);
+		return false;
+	}
+	++endptr;
+
+	// Parse pattern
+	// I hope 1-100 is acceptable for (void *)
+	return c2_parse(res, endptr, (void *)val);
+}
+
+/**
  * Add a pattern to a condition linked list.
  */
 bool condlst_add(c2_lptr_t **pcondlst, const char *pattern) {
@@ -500,6 +536,12 @@ void set_default_winopts(options_t *opt, win_option_mask_t *mask, bool shadow_en
 			// opacity logic is complicated, and needs an "unset" state
 			opt->wintype_option[i].opacity = NAN;
 		}
+        if (!mask[i].corner_radius) {
+            opt->wintype_option[i].corner_radius = -1;
+        }
+        if (!mask[i].round_borders) {
+            opt->wintype_option[i].round_borders = -1;
+        }
 	}
 }
 
@@ -556,7 +598,7 @@ char *parse_config(options_t *opt, const char *config_file, bool *shadow_enable,
 	    .blur_method = BLUR_METHOD_NONE,
 	    .blur_radius = 3,
 	    .blur_deviation = 0.84089642,
-	    .blur_strength = 5,
+	    .blur_strength = { .strength = -1, .iterations = 3, .offset = 2.75, .expand = 50 },
 	    .blur_background_frame = false,
 	    .blur_background_fixed = false,
 	    .blur_background_blacklist = NULL,
@@ -576,7 +618,9 @@ char *parse_config(options_t *opt, const char *config_file, bool *shadow_enable,
 
 	    .track_leader = false,
 
-	    .rounded_corners_blacklist = NULL
+	    .rounded_corners_blacklist = NULL,
+	    .round_borders_blacklist = NULL,
+	    .round_borders_rules = NULL
 	};
 	// clang-format on
 

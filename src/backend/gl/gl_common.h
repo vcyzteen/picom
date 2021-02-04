@@ -34,10 +34,24 @@ typedef struct {
 	GLuint prog;
 	GLint unifm_pixel_norm;
 	GLint unifm_opacity;
+	GLint unifm_texture_size;
+	GLint unifm_halfpixel;
 	GLint orig_loc;
 	GLint texorig_loc;
 	GLint scale_loc;
 } gl_blur_shader_t;
+
+typedef struct {
+	GLuint prog;
+	GLint projection_loc;
+	GLint unifm_radius;
+	GLint unifm_texcoord;
+	GLint unifm_texsize;
+	GLint unifm_borderw;
+	GLint unifm_resolution;
+	GLint unifm_tex_bg;
+	GLint unifm_tex_wnd;
+} gl_round_shader_t;
 
 typedef struct {
 	GLuint prog;
@@ -100,7 +114,7 @@ GLuint gl_create_program_from_str(const char *vert_shader_str, const char *frag_
 /**
  * @brief Render a region with texture data.
  */
-void gl_compose(backend_t *, void *ptex, int dst_x, int dst_y, const region_t *reg_tgt,
+void gl_compose(backend_t *, struct managed_win *, void *ptex, int dst_x, int dst_y, const region_t *reg_tgt,
                 const region_t *reg_visible);
 
 void gl_resize(struct gl_data *, int width, int height);
@@ -122,6 +136,14 @@ bool gl_blur(backend_t *base, double opacity, void *, const region_t *reg_blur,
 void *gl_create_blur_context(backend_t *base, enum blur_method, void *args);
 void gl_destroy_blur_context(backend_t *base, void *ctx);
 void gl_get_blur_size(void *blur_context, int *width, int *height);
+
+
+bool gl_round(backend_t *backend_data, struct managed_win *w, void *ctx_,
+				void *image_data, const region_t *reg_round, const region_t *reg_visible);
+void *gl_create_round_context(backend_t *base, void *args);
+void gl_destroy_round_context(backend_t *base, void *ctx);
+bool gl_store_back_texture(backend_t *backend_data, struct managed_win *w,
+				void *ctx_, const region_t *reg_tgt, int x, int y, int width, int height);
 
 bool gl_is_image_transparent(backend_t *base, void *image_data);
 void gl_fill(backend_t *base, struct color, const region_t *clip);

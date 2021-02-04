@@ -241,7 +241,7 @@ uint32_t make_rounded_window_shape(xcb_render_trapezoid_t traps[], uint32_t max_
 	return n;
 }
 
-void render(session_t *ps, int x, int y, int dx, int dy, int wid, int hei, int fullwid,
+void render(session_t *ps, struct managed_win *w attr_unused, int x, int y, int dx, int dy, int wid, int hei, int fullwid,
             int fullhei, double opacity, bool argb, bool neg, int cr,
             xcb_render_picture_t pict, glx_texture_t *ptex, const region_t *reg_paint,
             const glx_prog_main_t *pprogram, clip_t *clip) {
@@ -332,8 +332,8 @@ void render(session_t *ps, int x, int y, int dx, int dy, int wid, int hei, int f
 	}
 #ifdef CONFIG_OPENGL
 	case BKEND_GLX:
-		glx_render(ps, ptex, x, y, dx, dy, wid, hei, ps->psglx->z, opacity, argb,
-		           neg, reg_paint, pprogram);
+		glx_render(ps, w, ptex, x, y, dx, dy, wid, hei, ps->psglx->z, opacity, argb,
+		           neg, cr, reg_paint, pprogram);
 		ps->psglx->z += 1;
 		break;
 #endif
@@ -348,7 +348,7 @@ void render(session_t *ps, int x, int y, int dx, int dy, int wid, int hei, int f
 }
 
 static inline void
-paint_region(session_t *ps, const struct managed_win *w, int x, int y, int wid, int hei,
+paint_region(session_t *ps, struct managed_win *w, int x, int y, int wid, int hei,
              double opacity, const region_t *reg_paint, xcb_render_picture_t pict) {
 	const int dx = (w ? w->g.x : 0) + x;
 	const int dy = (w ? w->g.y : 0) + y;
@@ -357,7 +357,7 @@ paint_region(session_t *ps, const struct managed_win *w, int x, int y, int wid, 
 	const bool argb = (w && (win_has_alpha(w) || ps->o.force_win_blend));
 	const bool neg = (w && w->invert_color);
 
-	render(ps, x, y, dx, dy, wid, hei, fullwid, fullhei, opacity, argb, neg,
+	render(ps, w, x, y, dx, dy, wid, hei, fullwid, fullhei, opacity, argb, neg,
 	       w ? w->corner_radius : 0, pict,
 	       (w ? w->paint.ptex : ps->root_tile_paint.ptex), reg_paint,
 #ifdef CONFIG_OPENGL
@@ -780,7 +780,7 @@ win_paint_shadow(session_t *ps, struct managed_win *w, region_t *reg_paint) {
 	    .x = -(w->shadow_dx),
 	    .y = -(w->shadow_dy),
 	};
-	render(ps, 0, 0, w->g.x + w->shadow_dx, w->g.y + w->shadow_dy, w->shadow_width,
+	render(ps, w, 0, 0, w->g.x + w->shadow_dx, w->g.y + w->shadow_dy, w->shadow_width,
 	       w->shadow_height, w->widthb, w->heightb, w->shadow_opacity, true, false, 0,
 	       w->shadow_paint.pict, w->shadow_paint.ptex, reg_paint, NULL,
 	       should_clip ? &clip : NULL);
@@ -954,7 +954,7 @@ win_blur_background(session_t *ps, struct managed_win *w, xcb_render_picture_t t
 	case BKEND_GLX:
 		// TODO(compton) Handle frame opacity
 		glx_blur_dst(ps, x, y, wid, hei, (float)ps->psglx->z - 0.5f,
-		             (float)factor_center, reg_paint, &w->glx_blur_cache);
+		             (float)w->opacity, reg_paint, &w->glx_blur_cache);
 		break;
 #endif
 	default: assert(0);
@@ -1243,8 +1243,8 @@ void paint_all(session_t *ps, struct managed_win *t, bool ignore_damage) {
 		else
 			glFlush();
 		glXWaitX();
-		glx_render(ps, ps->tgt_buffer.ptex, 0, 0, 0, 0, ps->root_width,
-		           ps->root_height, 0, 1.0, false, false, &region, NULL);
+		glx_render(ps, t, ps->tgt_buffer.ptex, 0, 0, 0, 0, ps->root_width,
+		           ps->root_height, 0, 1.0, false, false, 0, &region, NULL);
 		fallthrough();
 	case BKEND_GLX: glXSwapBuffers(ps->dpy, get_tgt_window(ps)); break;
 #endif
@@ -1363,13 +1363,15 @@ bool init_render(session_t *ps) {
 	}
 
 	// Blur filter
-	if (ps->o.blur_method && ps->o.blur_method != BLUR_METHOD_KERNEL) {
-		log_warn("Old backends only support blur method \"kernel\". Your blur "
+	if (ps->o.blur_method && ps->o.blur_method != BLUR_METHOD_KERNEL &&
+		ps->o.blur_method != BLUR_METHOD_DUAL_KAWASE && ps->o.blur_method != BLUR_METHOD_ALT_KAWASE) {
+		log_warn("Old backends only support blur methods \"kernel|kawase\". Your blur "
 		         "setting will not be applied");
 		ps->o.blur_method = BLUR_METHOD_NONE;
 	}
 
-	if (ps->o.blur_method == BLUR_METHOD_KERNEL) {
+	if (ps->o.blur_method == BLUR_METHOD_KERNEL || ps->o.blur_method == BLUR_METHOD_DUAL_KAWASE
+						|| ps->o.blur_method == BLUR_METHOD_ALT_KAWASE) {
 		ps->blur_kerns_cache =
 		    ccalloc(ps->o.blur_kernel_count, struct x_convolution_kernel *);
 

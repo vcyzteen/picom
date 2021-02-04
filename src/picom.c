@@ -440,6 +440,11 @@ static void destroy_backend(session_t *ps) {
 			    ps->backend_data, ps->backend_blur_context);
 			ps->backend_blur_context = NULL;
 		}
+		if (ps->backend_round_context) {
+			ps->backend_data->ops->destroy_round_context(
+			    ps->backend_data, ps->backend_round_context);
+			ps->backend_round_context = NULL;
+		}
 		ps->backend_data->ops->deinit(ps->backend_data);
 		ps->backend_data = NULL;
 	}
@@ -468,8 +473,9 @@ static bool initialize_blur(session_t *ps) {
 		args = (void *)&gargs;
 		break;
 	case BLUR_METHOD_DUAL_KAWASE:
+	case BLUR_METHOD_ALT_KAWASE:
 		dkargs.size = ps->o.blur_radius;
-		dkargs.strength = ps->o.blur_strength;
+		dkargs.strength = ps->o.blur_strength.strength;
 		args = (void *)&dkargs;
 		break;
 	default: return true;
@@ -478,6 +484,15 @@ static bool initialize_blur(session_t *ps) {
 	ps->backend_blur_context = ps->backend_data->ops->create_blur_context(
 	    ps->backend_data, ps->o.blur_method, args);
 	return ps->backend_blur_context != NULL;
+}
+
+static bool initialize_round_corners(session_t *ps) {
+	struct round_corners_args cargs;
+	cargs.corner_radius = ps->o.corner_radius;
+	cargs.round_borders = ps->o.round_borders;
+	ps->backend_round_context = ps->backend_data->ops->create_round_context(
+	    ps->backend_data, &cargs);
+	return ps->backend_round_context != NULL;
 }
 
 /// Init the backend and bind all the window pixmap to backend images
@@ -500,6 +515,11 @@ static bool initialize_backend(session_t *ps) {
 			ps->backend_data = NULL;
 			quit(ps);
 			return false;
+		}
+
+		if (!initialize_round_corners(ps)) {
+			log_fatal("Failed to prepare for rounded corners, will ignore...");
+			ps->o.corner_radius = 0;
 		}
 
 		// window_stack shouldn't include window that's
@@ -678,7 +698,7 @@ static struct managed_win *paint_preprocess(session_t *ps, bool *fade_running) {
 		}
 
 		// Update window mode
-		w->mode = win_calc_mode(w);
+		w->mode = win_calc_mode(ps, w);
 
 		// Destroy all reg_ignore above when frame opaque state changes on
 		// SOLID mode
@@ -1918,6 +1938,8 @@ static session_t *session_init(int argc, char **argv, Display *dpy,
 	      c2_list_postprocess(ps, ps->o.invert_color_list) &&
 	      c2_list_postprocess(ps, ps->o.opacity_rules) &&
 	      c2_list_postprocess(ps, ps->o.rounded_corners_blacklist) &&
+	      c2_list_postprocess(ps, ps->o.round_borders_blacklist) &&
+	      c2_list_postprocess(ps, ps->o.round_borders_rules) &&
 	      c2_list_postprocess(ps, ps->o.focus_blacklist))) {
 		log_error("Post-processing of conditionals failed, some of your rules "
 		          "might not work");
@@ -2296,6 +2318,8 @@ static void session_destroy(session_t *ps) {
 	free_wincondlst(&ps->o.paint_blacklist);
 	free_wincondlst(&ps->o.unredir_if_possible_blacklist);
 	free_wincondlst(&ps->o.rounded_corners_blacklist);
+	free_wincondlst(&ps->o.round_borders_blacklist);
+	free_wincondlst(&ps->o.round_borders_rules);
 
 	// Free tracked atom list
 	{

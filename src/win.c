@@ -721,8 +721,12 @@ bool win_client_has_alpha(const struct managed_win *w) {
 	       w->client_pictfmt->direct.alpha_mask;
 }
 
-winmode_t win_calc_mode(const struct managed_win *w) {
+winmode_t win_calc_mode(session_t *ps, const struct managed_win *w) {
 	if (w->opacity < 1.0) {
+		return WMODE_TRANS;
+	}
+
+	if (ps->o.backend == BKEND_GLX && w->corner_radius > 0) {
 		return WMODE_TRANS;
 	}
 
@@ -1085,6 +1089,38 @@ static void win_determine_rounded_corners(session_t *ps, struct managed_win *w) 
 	} else {
 		w->corner_radius = ps->o.corner_radius;
 		log_debug("Rounding corners for window %#010x", w->base.id);
+
+		// HACK: we reset this so we can query the color once
+		// we query the color in glx_round_corners_dst0 using glReadPixels
+		//w->border_col = { -1., -1, -1, -1 };
+		w->border_col[0] = w->border_col[1] = w->border_col[2] = w->border_col[3] = -1.0;
+
+		// wintypes config section override
+		if (!safe_isnan(ps->o.wintype_option[w->window_type].corner_radius) &&
+		    ps->o.wintype_option[w->window_type].corner_radius >= 0) {
+		    w->corner_radius = ps->o.wintype_option[w->window_type].corner_radius;
+		    //log_warn("xy(%d %d) wh(%d %d) wintypes:corner_radius: %d", w->g.x, w->g.y, w->widthb, w->heightb, w->corner_radius);
+		}
+		
+		void *val = NULL;
+		if (c2_match(ps, w, ps->o.round_borders_rules, &val)) {
+		    w->border_width = (uint16_t)((long)val);
+		    //log_warn("xy(%d %d) wh(%d %d) border_width:rule:%d", w->g.x, w->g.y, w->widthb, w->heightb, w->g.border_width);
+		} else {
+		    w->border_width = 0;
+		}
+		
+		if (w && c2_match(ps, w, ps->o.round_borders_blacklist, NULL)) {
+		    w->round_borders = 0;
+		} else {
+		    w->round_borders = ps->o.round_borders;
+		    // wintypes config section override
+		    if (!safe_isnan(ps->o.wintype_option[w->window_type].round_borders) &&
+		        ps->o.wintype_option[w->window_type].round_borders >= 0) {
+		        w->round_borders = ps->o.wintype_option[w->window_type].round_borders;
+		        //log_warn("wintypes:round_borders: %d", w->round_borders);
+		    }
+		}
 	}
 }
 
@@ -1123,7 +1159,7 @@ void win_on_factor_change(session_t *ps, struct managed_win *w) {
 	win_determine_invert_color(ps, w);
 	win_determine_blur_background(ps, w);
 	win_determine_rounded_corners(ps, w);
-	w->mode = win_calc_mode(w);
+	w->mode = win_calc_mode(ps, w);
 	log_debug("Window mode changed to %d", w->mode);
 	win_update_opacity_rule(ps, w);
 	if (w->a.map_state == XCB_MAP_STATE_VIEWABLE) {
@@ -2389,7 +2425,7 @@ void map_win_start(session_t *ps, struct managed_win *w) {
 	w->a.map_state = XCB_MAP_STATE_VIEWABLE;
 
 	// Update window mode here to check for ARGB windows
-	w->mode = win_calc_mode(w);
+	w->mode = win_calc_mode(ps, w);
 
 	log_debug("Window (%#010x) has type %s", w->base.id, WINTYPES[w->window_type]);
 

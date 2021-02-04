@@ -250,6 +250,31 @@ parse_cfg_condlst_opct(options_t *opt, const config_t *pcfg, const char *name) {
 	}
 }
 
+/**
+ * Parse an opacity rule list in configuration file.
+ */
+static inline void
+parse_cfg_condlst_border(options_t *opt, const config_t *pcfg, const char *name) {
+	config_setting_t *setting = config_lookup(pcfg, name);
+	if (setting) {
+		// Parse an array of options
+		if (config_setting_is_array(setting)) {
+			int i = config_setting_length(setting);
+			while (i--)
+				if (!parse_rule_border(
+				        &opt->round_borders_rules,
+				        config_setting_get_string_elem(setting, i)))
+					exit(1);
+		}
+		// Treat it as a single pattern if it's a string
+		else if (config_setting_type(setting) == CONFIG_TYPE_STRING) {
+			if (!parse_rule_border(&opt->round_borders_rules,
+			                        config_setting_get_string(setting)))
+				exit(1);
+		}
+	}
+}
+
 static inline void parse_wintype_config(const config_t *cfg, const char *member_name,
                                         win_option_t *o, win_option_mask_t *mask) {
 	char *str = mstrjoin("wintypes.", member_name);
@@ -288,6 +313,18 @@ static inline void parse_wintype_config(const config_t *cfg, const char *member_
 			o->opacity = normalize_d(fval);
 			mask->opacity = true;
 		}
+
+		if (config_setting_lookup_int(setting, "corner-radius", &ival)) {
+			o->corner_radius = ival;
+			mask->corner_radius = true;
+            //log_warn("%s: corner-radius: %d", member_name, ival);
+		}
+        if (config_setting_lookup_int(setting, "round-borders", &ival)) {
+			o->round_borders = ival;
+			mask->round_borders = true;
+            //log_warn("%s: round_borders: %d", member_name, ival);
+		}
+
 	}
 }
 
@@ -378,6 +415,12 @@ char *parse_config_libconfig(options_t *opt, const char *config_file, bool *shad
 	config_lookup_int(&cfg, "corner-radius", &opt->corner_radius);
 	// --rounded-corners-exclude
 	parse_cfg_condlst(&cfg, &opt->rounded_corners_blacklist, "rounded-corners-exclude");
+	// --round-borders
+	config_lookup_int(&cfg, "round-borders", &opt->round_borders);
+	// --round-borders-exclude
+	parse_cfg_condlst(&cfg, &opt->round_borders_blacklist, "round-borders-exclude");
+	// --round-borders-rules
+	parse_cfg_condlst_border(opt, &cfg, "round-borders-rule");
 	// -e (frame_opacity)
 	config_lookup_float(&cfg, "frame-opacity", &opt->frame_opacity);
 	// -c (shadow_enable)
@@ -463,6 +506,7 @@ char *parse_config_libconfig(options_t *opt, const char *config_file, bool *shad
 	}
 	lcfg_lookup_bool(&cfg, "vsync", &opt->vsync);
 	// --backend
+	lcfg_lookup_bool(&cfg, "experimental-backends", &opt->experimental_backends);
 	if (config_lookup_string(&cfg, "backend", &sval)) {
 		opt->backend = parse_backend(sval);
 		if (opt->backend >= NUM_BKEND) {
@@ -540,7 +584,9 @@ char *parse_config_libconfig(options_t *opt, const char *config_file, bool *shad
 	// --blur-deviation
 	config_lookup_float(&cfg, "blur-deviation", &opt->blur_deviation);
 	// --blur-strength
-	config_lookup_int(&cfg, "blur-strength", &opt->blur_strength);
+	if (config_lookup_int(&cfg, "blur-strength", &ival) && ival) {
+		opt->blur_strength = parse_kawase_blur_strength(ival);
+	}
 	// --blur-background
 	if (config_lookup_bool(&cfg, "blur-background", &ival) && ival) {
 		if (opt->blur_method == BLUR_METHOD_NONE) {
@@ -651,7 +697,10 @@ char *parse_config_libconfig(options_t *opt, const char *config_file, bool *shad
 		}
 
 		config_setting_lookup_float(blur_cfg, "deviation", &opt->blur_deviation);
-		config_setting_lookup_int(blur_cfg, "strength", &opt->blur_strength);
+
+		if (config_setting_lookup_int(blur_cfg, "strength", &ival) && ival) {
+			opt->blur_strength = parse_kawase_blur_strength(ival);
+		}
 	}
 
 	// --write-pid-path

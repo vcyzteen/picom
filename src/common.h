@@ -75,6 +75,9 @@
 /// @brief Maximum OpenGL buffer age.
 #define CGLX_MAX_BUFFER_AGE 5
 
+/// @brief Maximum passes for blur.
+#define MAX_BLUR_PASS 6
+
 // Window flags
 
 // === Types ===
@@ -157,6 +160,8 @@ typedef struct session {
 	backend_t *backend_data;
 	/// backend blur context
 	void *backend_blur_context;
+	/// round corners context
+	void *backend_round_context;
 	/// graphic drivers used
 	enum driver drivers;
 	/// file watch handle
