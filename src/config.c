@@ -20,6 +20,7 @@
 #include "types.h"
 #include "utils.h"
 #include "win.h"
+#include "timing_functions.h"
 
 #include "config.h"
 
@@ -617,6 +618,10 @@ char *parse_config(options_t *opt, const char *config_file, bool *shadow_enable,
 	    .no_ewmh_fullscreen = false,
 
 	    .track_leader = false,
+
+		.transition_direction = -1,
+		.transition_rules = NULL,
+		.transition_duration = 0,
 
 	    .rounded_corners_blacklist = NULL,
 	    .round_borders_blacklist = NULL,
