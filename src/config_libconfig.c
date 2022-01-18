@@ -311,6 +311,31 @@ timing_function parse_timing_function(const char* timing_name) {
 	return NULL;
 }
 
+/**
+ * Parse an opacity rule list in configuration file.
+ */
+static inline void
+parse_cfg_condlst_border(options_t *opt, const config_t *pcfg, const char *name) {
+	config_setting_t *setting = config_lookup(pcfg, name);
+	if (setting) {
+		// Parse an array of options
+		if (config_setting_is_array(setting)) {
+			int i = config_setting_length(setting);
+			while (i--)
+				if (!parse_rule_border(
+				        &opt->round_borders_rules,
+				        config_setting_get_string_elem(setting, i)))
+					exit(1);
+		}
+		// Treat it as a single pattern if it's a string
+		else if (config_setting_type(setting) == CONFIG_TYPE_STRING) {
+			if (!parse_rule_border(&opt->round_borders_rules,
+			        config_setting_get_string(setting)))
+			exit(1);
+		}
+	}
+}
+
 static inline void parse_cfg_condlst_trns(options_t *opt, const config_t *pcfg, const char *name) {
 	config_setting_t *setting = config_lookup(pcfg, name);
 	if (setting) {
