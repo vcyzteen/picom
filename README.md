@@ -1,13 +1,16 @@
 [**Click here for the official picom README**](https://github.com/yshui/picom)
 
 ## <p align="center">BEFORE</p>
-![before](https://i.postimg.cc/kD4KsWBG/2022-01-18-17-46-42-screenshot.png)
+
+<img src="https://i.postimg.cc/kD4KsWBG/2022-01-18-17-46-42-screenshot.png" />
+
 ## <p align="center">AFTER</p>
-![after](https://i.postimg.cc/DJYWHY8Z/2022-01-18-17-49-15-screenshot.png)
+
+<img src="https://i.postimg.cc/DJYWHY8Z/2022-01-18-17-49-15-screenshot.png" />
 
 ## Why another picom fork?
 
-**TL;DR:** rounded corners, improve commit from yshui next base and dual_kawase blur on all backends.
+**TL;DR:** rounded corners, upstream commit from yshui next base and dual_kawase blur on all backends.
 
 ### This fork contains:
 
