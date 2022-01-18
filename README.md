@@ -45,7 +45,7 @@ However, not all code / features have been merged, ATM the status is as per the 
 
 ### Updated fork
 
-Just fork from ibaghwan and upstream commit from yshui ( official picom )
+Just fork from ibaghwan and upstream commit from yshui ( official picom ) and upstream commit from another pull request
 
 ```sh
 ❯ git clone --single-branch --branch next-yshui --depth=1 https://github.com/vcyzteen/picom.git
