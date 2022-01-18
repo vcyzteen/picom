@@ -24,17 +24,80 @@
 
 - Trasition Windows Animated from [Arian8j2](https://github.com/Arian8j2)
 
-## How to install
+### Dependencies
 
-Clone this repo and follow the [build instructions of the official picom README](https://github.com/yshui/picom/blob/next/README.md#build)
+Assuming you already have all the usual building tools installed (e.g. gcc, python, meson, ninja, etc.), you still need:
 
+* libx11
+* libx11-xcb
+* libXext
+* xproto
+* xcb
+* xcb-damage
+* xcb-xfixes
+* xcb-shape
+* xcb-renderutil
+* xcb-render
+* xcb-randr
+* xcb-composite
+* xcb-image
+* xcb-present
+* xcb-xinerama
+* xcb-glx
+* pixman
+* libdbus (optional, disable with the `-Ddbus=false` meson configure flag)
+* libconfig (optional, disable with the `-Dconfig_file=false` meson configure flag)
+* libGL (optional, disable with the `-Dopengl=false` meson configure flag)
+* libpcre (optional, disable with the `-Dregex=false` meson configure flag)
+* libev
+* uthash
 
-## 2021-02-05 Update
+On Debian based distributions (e.g. Ubuntu), the needed packages are
 
-It's been a while since this fork had some work and the good people at [the main picom branch](https://github.com/yshui/picom) merged some of this code into the main branch.
+```
+libxext-dev libxcb1-dev libxcb-damage0-dev libxcb-xfixes0-dev libxcb-shape0-dev libxcb-render-util0-dev libxcb-render0-dev libxcb-randr0-dev libxcb-composite0-dev libxcb-image0-dev libxcb-present-dev libxcb-xinerama0-dev libxcb-glx0-dev libpixman-1-dev libdbus-1-dev libconfig-dev libgl1-mesa-dev libpcre2-dev libpcre3-dev libevdev-dev uthash-dev libev-dev libx11-xcb-dev meson
+```
 
-However, not all code / features have been merged, ATM the status is as per the below:
+On Fedora, the needed packages are
 
+```
+dbus-devel gcc git libconfig-devel libdrm-devel libev-devel libX11-devel libX11-xcb libXext-devel libxcb-devel mesa-libGL-devel meson pcre-devel pixman-devel uthash-devel xcb-util-image-devel xcb-util-renderutil-devel xorg-x11-proto-devel
+```
+
+To build the documents, you need `asciidoc`
+
+### To build
+
+```bash
+$ git submodule update --init --recursive
+$ meson --buildtype=release . build
+$ ninja -C build
+```
+
+Built binary can be found in `build/src`
+
+If you have libraries and/or headers installed at non-default location (e.g. under `/usr/local/`), you might need to tell meson about them, since meson doesn't look for dependencies there by default.
+
+You can do that by setting the `CPPFLAGS` and `LDFLAGS` environment variables when running `meson`. Like this:
+
+```bash
+$ LDFLAGS="-L/path/to/libraries" CPPFLAGS="-I/path/to/headers" meson --buildtype=release . build
+
+```
+
+As an example, on FreeBSD, you might have to run meson with:
+```bash
+$ LDFLAGS="-L/usr/local/lib" CPPFLAGS="-I/usr/local/include" meson --buildtype=release . build
+$ ninja -C build
+```
+
+### To install
+
+``` bash
+$ sudo ninja -C build install
+```
+
+Default install prefix is `/usr/local`, you can change it with `meson configure -Dprefix=<path> build`
 
 ### Included in main branch
 
