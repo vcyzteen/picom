@@ -22,6 +22,8 @@
 
 - New code for rounded corners (+borders) on the glx backend using GLSL fragment shader for both legacy and experimental backends
 
+- Trasition Windows Animated from [Arian8j2](https://github.com/Arian8j2)
+
 For more information read [ibhagwan reddit post](https://www.reddit.com/r/unixporn/comments/fs8trg/oc_comptonpicom_fork_with_both_tryone144s_dual/)
 
 ## How to install
