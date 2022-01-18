@@ -2,11 +2,13 @@
 
 ## <p align="center">BEFORE</p>
 
-<img src="https://i.postimg.cc/kD4KsWBG/2022-01-18-17-46-42-screenshot.png" />
+
+<img src="https://i.postimg.cc/44vPJ5G6/2022-01-18-17-46-42-screenshot.png" />
 
 ## <p align="center">AFTER</p>
 
-<img src="https://i.postimg.cc/DJYWHY8Z/2022-01-18-17-49-15-screenshot.png" />
+
+<img src="https://i.postimg.cc/6qBd7kKd/2022-01-18-17-49-15-screenshot.png" />
 
 ## Why another picom fork?
 
