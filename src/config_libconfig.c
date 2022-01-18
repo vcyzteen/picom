@@ -245,7 +245,7 @@ parse_cfg_condlst_opct(options_t *opt, const config_t *pcfg, const char *name) {
 		// Treat it as a single pattern if it's a string
 		else if (config_setting_type(setting) == CONFIG_TYPE_STRING) {
 			if (!parse_rule_opacity(&opt->opacity_rules,
-			                        config_setting_get_string(setting)))
+			        config_setting_get_string(setting)))
 				exit(1);
 		}
 	}
