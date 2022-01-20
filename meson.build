@@ -11,7 +11,7 @@ git = find_program('git', required: false)
 if git.found()
 	gitv = run_command('git', 'rev-parse', '--short=5', 'HEAD')
 	if gitv.returncode() == 0
-		version = 'vgit-'+gitv.stdout().strip()
+		version = 'vgit-'+meson.project_version()
 	endif
 endif
 
